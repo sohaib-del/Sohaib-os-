@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0A0A0A;
+  --surface: #111111;
+  --surface2: #1A1A1A;
+  --border: #222222;
+  --border2: #2E2E2E;
+  --text: #F0F0F0;
+  --text2: #888888;
+  --text3: #444444;
+  --green: #22C55E;
+  --green-dim: rgba(34, 197, 94, 0.12);
+  --red: #EF4444;
+  --red-dim: rgba(239, 68, 68, 0.12);
+  --amber: #F59E0B;
+  --amber-dim: rgba(245, 158, 11, 0.12);
+}
+
+.light {
+  --bg: #F5F5F5;
+  --surface: #FFFFFF;
+  --surface2: #F0F0F0;
+  --border: #E0E0E0;
+  --border2: #D0D0D0;
+  --text: #0A0A0A;
+  --text2: #666666;
+  --text3: #AAAAAA;
+}
+
+* { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.mono { 
+  font-family: 'Space Mono', monospace; 
+}
+
+@layer components {
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[2px] mb-3;
+    color: var(--text2);
+  }
+  
+  .card-base {
+    @apply p-4 rounded-[12px] border transition-all duration-150;
+    background-color: var(--surface);
+    border-color: var(--border);
+  }
+  
+  .card-base:hover {
+    border-color: var(--border2);
+  }
+  
+  .interactive-scale:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Custom Checkbox handled in JS components but common styles here if needed */
+
