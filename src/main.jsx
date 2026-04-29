@@ -2,12 +2,24 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
-import { migrateData } from './utils/supabase'
+import { supabase, migrateData } from './utils/supabase'
 import { setupNotificationEngine } from './utils/notifications'
 
-// Initialize Supabase sync and notification check
-migrateData();
-setupNotificationEngine();
+const init = async () => {
+  console.log("Initializing Sohaib OS...");
+  try {
+    await migrateData();
+    // Test connection
+    const { data, error } = await supabase.from('habits').select('*');
+    console.log('Supabase habits fetch:', data, error);
+    
+    setupNotificationEngine();
+  } catch (err) {
+    console.error("Initialization failed:", err);
+  }
+};
+
+init();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

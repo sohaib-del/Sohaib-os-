@@ -4,6 +4,7 @@ import { useHabits } from '../hooks/useHabits';
 import { supabase, migrateData } from '../utils/supabase';
 
 export default function SettingsView({ isDark, setIsDark }) {
+  console.log("SettingsView rendering...");
   const { habits, addHabit, deleteHabit } = useHabits();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newHabit, setNewHabit] = useState({ name: '', category: 'Custom', targetValue: '' });

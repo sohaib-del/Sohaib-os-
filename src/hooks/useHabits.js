@@ -83,10 +83,14 @@ export function useHabits() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
+    console.log("fetchData started");
     setLoading(true);
     
-    // Fetch Habits
-    const { data: habitsData } = await supabase.from('habits').select('*');
+    try {
+      // Fetch Habits
+      console.log("Fetching habits...");
+      const { data: habitsData, error: habitsError } = await supabase.from('habits').select('*');
+      if (habitsError) console.error("Habits fetch error:", habitsError);
     if (habitsData && habitsData.length > 0) {
       setHabits(habitsData.map(h => ({ ...h, streakCount: calculateStreak(h.logs) })));
     } else {
@@ -94,11 +98,16 @@ export function useHabits() {
     }
 
     // Fetch Slips
-    const { data: slipsData } = await supabase.from('slips').select('*');
+    console.log("Fetching slips...");
+    const { data: slipsData, error: slipsError } = await supabase.from('slips').select('*');
+    if (slipsError) console.error("Slips fetch error:", slipsError);
     setSlips(slipsData || []);
 
     // Fetch Settings (startDate)
-    const { data: settingsData } = await supabase.from('settings').select('*').eq('key', 'start_date').single();
+    console.log("Fetching settings...");
+    const { data: settingsData, error: settingsError } = await supabase.from('settings').select('*').eq('key', 'start_date').single();
+    if (settingsError && settingsError.code !== 'PGRST116') console.error("Settings fetch error:", settingsError);
+    
     if (settingsData) {
       setStartDate(settingsData.value);
     } else {
@@ -106,8 +115,12 @@ export function useHabits() {
       await supabase.from('settings').upsert({ key: 'start_date', value: now });
       setStartDate(now);
     }
-    
-    setLoading(false);
+    } catch (err) {
+      console.error("fetchData failed:", err);
+    } finally {
+      setLoading(false);
+      console.log("fetchData finished");
+    }
   };
 
   useEffect(() => {
