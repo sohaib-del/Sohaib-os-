@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { supabase } from '../utils/supabase';
 
 // Custom checkbox component
 const Checkbox = ({ checked, onChange }) => (
@@ -38,12 +39,25 @@ export default function PlannerView() {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskNote, setTaskNote] = useState('');
 
+  const fetchTasks = async () => {
+    const { data } = await supabase.from('tasks').select('*');
+    setTasks(data || []);
+  };
+
   useEffect(() => {
-    const existing = JSON.parse(localStorage.getItem('sohaibos_tasks') || '[]');
-    setTasks(existing);
+    fetchTasks();
+
+    const channel = supabase
+      .channel('tasks-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!taskTitle.trim()) return;
     
     const date = getTaskDate();
@@ -56,25 +70,21 @@ export default function PlannerView() {
       createdAt: new Date().toISOString()
     };
     
-    const existing = JSON.parse(localStorage.getItem('sohaibos_tasks') || '[]');
-    const updated = [...existing, newTask];
-    localStorage.setItem('sohaibos_tasks', JSON.stringify(updated));
+    await supabase.from('tasks').insert(newTask);
     
-    setTasks(updated);
     setTaskTitle('');
     setTaskNote('');
   };
 
-  const toggleTask = (id) => {
-    const updated = tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
-    localStorage.setItem('sohaibos_tasks', JSON.stringify(updated));
-    setTasks(updated);
+  const toggleTask = async (id) => {
+    const task = tasks.find(t => t.id === id);
+    if (task) {
+      await supabase.from('tasks').update({ done: !task.done }).eq('id', id);
+    }
   };
 
-  const deleteTask = (id) => {
-    const updated = tasks.filter(t => t.id !== id);
-    localStorage.setItem('sohaibos_tasks', JSON.stringify(updated));
-    setTasks(updated);
+  const deleteTask = async (id) => {
+    await supabase.from('tasks').delete().eq('id', id);
   };
 
   const todayStr = getTaskDate();

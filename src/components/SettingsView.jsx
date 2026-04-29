@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Moon, Sun, Bell, Trash2, Plus, LogOut } from 'lucide-react';
+import { Moon, Sun, Bell, Trash2, Plus, LogOut, Cloud } from 'lucide-react';
 import { useHabits } from '../hooks/useHabits';
+import { supabase, migrateData } from '../utils/supabase';
 
 export default function SettingsView({ isDark, setIsDark }) {
   const { habits, addHabit, deleteHabit } = useHabits();
@@ -31,27 +32,25 @@ export default function SettingsView({ isDark, setIsDark }) {
     setNewHabit({ name: '', category: 'Custom', targetValue: '' });
   };
 
-  const hardReset = () => {
-    if (confirm('This will delete everything permanently. Are you sure?')) {
-      const keysToRemove = [
-        'sohaibos_habits', 
-        'sohaibos_slips', 
-        'sohaibos_tasks', 
-        'sohaibos_journal_entries', 
-        'sohaibos_logs', 
-        'sohaibos_theme', 
-        'sohaibos_pushup_start',
-        'sohaibos_start_date'
-      ];
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      
-      const allKeys = Object.keys(localStorage);
-      allKeys.forEach(k => {
-        if (k.startsWith('sohaibos_')) {
-          localStorage.removeItem(k);
-        }
-      });
+  const hardReset = async () => {
+    if (confirm('This will delete everything permanently from Supabase. Are you sure?')) {
+      const tables = ['habits', 'slips', 'tasks', 'journal_entries', 'logs', 'settings'];
+      for (const table of tables) {
+        await supabase.from(table).delete().neq('id', '0'); // Delete all rows
+      }
+      localStorage.clear();
       window.location.reload();
+    }
+  };
+
+  const forceSync = async () => {
+    try {
+      await migrateData();
+      alert('Data synced to cloud successfully!');
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      alert('Sync failed. Check console.');
     }
   };
 
@@ -153,6 +152,30 @@ export default function SettingsView({ isDark, setIsDark }) {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Sync to Cloud */}
+      <section style={{ marginBottom: '32px' }}>
+        <p className="section-label" style={{ color: 'var(--green)' }}>CLOUD SYNC</p>
+        <button 
+          onClick={forceSync}
+          className="interactive-scale w-full"
+          style={{
+            height: '44px',
+            border: '1px solid var(--green)',
+            borderRadius: '10px',
+            background: 'none',
+            color: 'var(--green)',
+            fontSize: '13px',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <Cloud size={16} /> SYNC DATA TO CLOUD
+        </button>
       </section>
 
       {/* Factory Reset */}

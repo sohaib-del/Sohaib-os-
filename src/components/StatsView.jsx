@@ -2,6 +2,7 @@ import { useMemo, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 import { DownloadIcon, AlertTriangle, Brain, Target, Clock, Zap } from 'lucide-react';
+import { supabase } from '../utils/supabase';
 
 const WIN_COLORS = ['#22C55E', '#4ade80', '#10b981', '#059669', '#86efac', '#34d399', '#6ee7b7'];
 const LOSS_COLORS = ['#EF4444', '#f87171', '#dc2626', '#b91c1c', '#fca5a5', '#ef4444', '#f87171'];
@@ -30,12 +31,15 @@ export default function StatsView({ habits, slips }) {
     });
   }, [habits]);
 
-  const exportJSON = () => {
+  const exportJSON = async () => {
+    const { data: journal } = await supabase.from('journal_entries').select('*');
+    const { data: planner } = await supabase.from('tasks').select('*');
+    
     const data = {
       timestamp: new Date().toISOString(),
       habits, slips,
-      journal: JSON.parse(localStorage.getItem('sohaibos_journal_entries') || '[]'),
-      planner: JSON.parse(localStorage.getItem('sohaibos_planner_tasks') || '[]')
+      journal: journal || [],
+      planner: planner || []
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     downloadBlob(blob, `sohaibos-export-${format(new Date(), 'yyyy-MM-dd')}.json`);

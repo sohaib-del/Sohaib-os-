@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { storage } from '../utils/storage';
+import { supabase } from '../utils/supabase';
 
 const DEFAULT_HABITS = [
   {
@@ -7,7 +7,7 @@ const DEFAULT_HABITS = [
     name: 'Pushups',
     category: 'Physical',
     type: 'Daily',
-    targetValue: 15, // Will be overridden by dynamic logic
+    targetValue: 15,
     autoIncrement: true,
     slipReasonEnabled: false,
     streakCount: 0,
@@ -38,7 +38,7 @@ const DEFAULT_HABITS = [
     name: 'Task Completion',
     category: 'Work',
     type: 'Daily',
-    targetValue: 'percentage', // Specialized rendering
+    targetValue: 'percentage',
     streakCount: 0,
     logs: []
   }
@@ -77,85 +77,97 @@ function calculateStreak(logs) {
 }
 
 export function useHabits() {
-  const [habits, setHabits] = useState(() => {
-    const loaded = storage.get('habits', DEFAULT_HABITS);
-    // Recalculate streaks on load to ensure consistency
-    return loaded.map(h => ({ ...h, streakCount: calculateStreak(h.logs) }));
-  });
-  
-  const [startDate, setStartDate] = useState(() => {
-    const existing = storage.get('start_date');
-    if (existing) return existing;
-    const now = new Date().toISOString();
-    storage.set('start_date', now);
-    return now;
-  });
+  const [habits, setHabits] = useState([]);
+  const [startDate, setStartDate] = useState(null);
+  const [slips, setSlips] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [slips, setSlips] = useState(() => {
-    return storage.get('slips', []);
-  });
-
-  useEffect(() => {
-    storage.set('habits', habits);
-  }, [habits]);
-
-  useEffect(() => {
-    storage.set('slips', slips);
-  }, [slips]);
-
-  const addHabit = (habit) => {
-    setHabits([...habits, { ...habit, logs: [], streakCount: 0, id: Date.now().toString() }]);
-  };
-
-  const updateHabit = (id, updates) => {
-    setHabits(habits.map(h => h.id === id ? { ...h, ...updates } : h));
-  };
-
-  const deleteHabit = (id) => {
-    setHabits(habits.filter(h => h.id !== id));
-  };
-
-  const logHabit = (id, status, reason = '') => {
-    const today = new Date().toLocaleDateString('en-CA');
+  const fetchData = async () => {
+    setLoading(true);
     
-    setHabits(current => current.map(habit => {
-      if (habit.id !== id) return habit;
-      
-      // BUG 1 FIX: Prevent duplicate logs on same day
-      const existingLog = habit.logs.find(l => l.date === today);
-      if (existingLog) return habit;
-      
-      const newLog = {
-        date: today,
-        status,
-        reason,
-        timestamp: new Date().toISOString()
-      };
+    // Fetch Habits
+    const { data: habitsData } = await supabase.from('habits').select('*');
+    if (habitsData && habitsData.length > 0) {
+      setHabits(habitsData.map(h => ({ ...h, streakCount: calculateStreak(h.logs) })));
+    } else {
+      setHabits(DEFAULT_HABITS);
+    }
 
-      const updatedLogs = [...habit.logs, newLog];
-      const newStreak = calculateStreak(updatedLogs);
+    // Fetch Slips
+    const { data: slipsData } = await supabase.from('slips').select('*');
+    setSlips(slipsData || []);
 
-      if (status === 'no' || status === 'missed') {
-        // BUG 3 FIX: Prevent duplicate slips for same habit on same day
-        setSlips(s => {
-          const slipExists = s.find(slip => slip.date === today && slip.habitName === habit.name);
-          if (slipExists) return s;
-          return [...s, {
-            date: today,
-            habitName: habit.name,
-            reason,
-            timestamp: new Date().toISOString(),
-            streakAtBreak: habit.streakCount
-          }];
+    // Fetch Settings (startDate)
+    const { data: settingsData } = await supabase.from('settings').select('*').eq('key', 'start_date').single();
+    if (settingsData) {
+      setStartDate(settingsData.value);
+    } else {
+      const now = new Date().toISOString();
+      await supabase.from('settings').upsert({ key: 'start_date', value: now });
+      setStartDate(now);
+    }
+    
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    // Real-time Sync
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'habits' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slips' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const addHabit = async (habit) => {
+    const newHabit = { ...habit, logs: [], id: Date.now().toString() };
+    await supabase.from('habits').insert(newHabit);
+  };
+
+  const updateHabit = async (id, updates) => {
+    await supabase.from('habits').update(updates).eq('id', id);
+  };
+
+  const deleteHabit = async (id) => {
+    await supabase.from('habits').delete().eq('id', id);
+  };
+
+  const logHabit = async (id, status, reason = '') => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const habit = habits.find(h => h.id === id);
+    if (!habit) return;
+
+    if (habit.logs.find(l => l.date === today)) return;
+
+    const newLog = {
+      date: today,
+      status,
+      reason,
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedLogs = [...habit.logs, newLog];
+    await supabase.from('habits').update({ logs: updatedLogs }).eq('id', id);
+
+    if (status === 'no' || status === 'missed') {
+      const slipExists = slips.find(slip => slip.date === today && slip.habitName === habit.name);
+      if (!slipExists) {
+        await supabase.from('slips').insert({
+          date: today,
+          habitName: habit.name,
+          reason,
+          timestamp: new Date().toISOString(),
+          streakAtBreak: habit.streakCount
         });
       }
-
-      return {
-        ...habit,
-        streakCount: newStreak,
-        logs: updatedLogs
-      };
-    }));
+    }
   };
 
   return {
@@ -165,6 +177,7 @@ export function useHabits() {
     addHabit,
     updateHabit,
     deleteHabit,
-    logHabit
+    logHabit,
+    loading
   };
 }

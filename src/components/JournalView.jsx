@@ -1,17 +1,31 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { storage } from '../utils/storage';
+import { supabase } from '../utils/supabase';
 
 export default function JournalView() {
-  const [entries, setEntries] = useState(() => storage.get('journal_entries', []));
+  const [entries, setEntries] = useState([]);
   const [currentEntry, setCurrentEntry] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    storage.set('journal_entries', entries);
-  }, [entries]);
+  const fetchEntries = async () => {
+    const { data } = await supabase.from('journal_entries').select('*').order('timestamp', { ascending: false });
+    setEntries(data || []);
+  };
 
-  const saveEntry = () => {
+  useEffect(() => {
+    fetchEntries();
+
+    const channel = supabase
+      .channel('journal-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_entries' }, () => fetchEntries())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const saveEntry = async () => {
     if (!currentEntry.trim()) return;
     
     const newEntryObj = {
@@ -21,7 +35,7 @@ export default function JournalView() {
       date: format(new Date(), 'yyyy-MM-dd')
     };
     
-    setEntries(current => [newEntryObj, ...current]);
+    await supabase.from('journal_entries').insert(newEntryObj);
     setCurrentEntry('');
   };
 

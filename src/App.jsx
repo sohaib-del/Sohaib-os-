@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Home, Calendar, BookOpen, BarChart2, Settings } from 'lucide-react';
 import { useHabits } from './hooks/useHabits';
+import { supabase } from './utils/supabase';
 import TodayView from './components/TodayView';
 import PlannerView from './components/PlannerView';
 import JournalView from './components/JournalView';
@@ -9,20 +10,38 @@ import SettingsView from './components/SettingsView';
 
 function App() {
   const [activeTab, setActiveTab] = useState('today');
-  const [isDark, setIsDark] = useState(() => {
-    return localStorage.getItem('sohaibos_theme') !== 'light';
-  });
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const fetchTheme = async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'theme').single();
+      if (data) {
+        setIsDark(data.value === 'dark');
+      }
+    };
+    fetchTheme();
+
+    const channel = supabase
+      .channel('theme-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'key=eq.theme' }, (payload) => {
+        setIsDark(payload.new.value === 'dark');
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');
-      localStorage.setItem('sohaibos_theme', 'dark');
     } else {
       document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('sohaibos_theme', 'light');
     }
+    supabase.from('settings').upsert({ key: 'theme', value: isDark ? 'dark' : 'light' });
   }, [isDark]);
 
   const { habits, logHabit, slips } = useHabits();
