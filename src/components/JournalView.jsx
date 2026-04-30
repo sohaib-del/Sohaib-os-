@@ -8,8 +8,18 @@ export default function JournalView() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchEntries = async () => {
-    const { data } = await supabase.from('journal_entries').select('*').order('timestamp', { ascending: false });
-    setEntries(data || []);
+    try {
+      const { data, error } = await supabase.from('journal_entries').select('*').order('timestamp', { ascending: false });
+      if (error) {
+        console.warn('Journal entries fetch error (table may not exist yet):', error.message);
+        setEntries([]);
+        return;
+      }
+      setEntries(data || []);
+    } catch (err) {
+      console.warn('Journal entries fetch crashed, using empty array:', err);
+      setEntries([]);
+    }
   };
 
   useEffect(() => {
@@ -18,7 +28,9 @@ export default function JournalView() {
     const channel = supabase
       .channel('journal-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_entries' }, () => fetchEntries())
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.warn('Realtime journal subscription error (non-fatal):', err.message);
+      });
 
     return () => {
       supabase.removeChannel(channel);

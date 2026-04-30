@@ -14,9 +14,17 @@ function App() {
 
   useEffect(() => {
     const fetchTheme = async () => {
-      const { data } = await supabase.from('settings').select('*').eq('key', 'theme').single();
-      if (data) {
-        setIsDark(data.value === 'dark');
+      try {
+        const { data, error } = await supabase.from('settings').select('*').eq('key', 'theme').single();
+        if (error) {
+          console.warn('Theme fetch error (table may not exist yet):', error.message);
+          return;
+        }
+        if (data) {
+          setIsDark(data.value === 'dark');
+        }
+      } catch (err) {
+        console.warn('Theme fetch crashed, using default (dark):', err);
       }
     };
     fetchTheme();
@@ -24,9 +32,13 @@ function App() {
     const channel = supabase
       .channel('theme-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'key=eq.theme' }, (payload) => {
-        setIsDark(payload.new.value === 'dark');
+        if (payload?.new?.value) {
+          setIsDark(payload.new.value === 'dark');
+        }
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.warn('Realtime theme subscription error (non-fatal):', err.message);
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -41,7 +53,10 @@ function App() {
       document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
     }
-    supabase.from('settings').upsert({ key: 'theme', value: isDark ? 'dark' : 'light' });
+    supabase.from('settings').upsert({ key: 'theme', value: isDark ? 'dark' : 'light' })
+      .then(({ error }) => {
+        if (error) console.warn('Theme upsert error (table may not exist yet):', error.message);
+      });
   }, [isDark]);
 
   const { habits, logHabit, slips } = useHabits();

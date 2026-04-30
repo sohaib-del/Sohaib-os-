@@ -13,18 +13,28 @@ export const setupNotificationEngine = () => {
 
     console.log(`[Notification Engine] Checking deadlines at ${currentTime}`);
 
-    // Fetch habits with reminders from Supabase
-    const { data: habits, error } = await supabase
-      .from('habits')
-      .select('*')
-      .not('reminderTime', 'is', null);
+    // Fetch all habits from Supabase — no column filter to avoid 400 errors
+    // reminderTime lives inside the JSON data, not as a table column
+    let habits = [];
+    try {
+      const { data, error } = await supabase
+        .from('habits')
+        .select('*');
 
-    if (error) {
-      console.error('Error fetching habits for notifications:', error);
+      if (error) {
+        console.warn('Notification: habits fetch error (table may not exist yet):', error.message);
+        return;
+      }
+      habits = data || [];
+    } catch (err) {
+      console.warn('Notification: habits fetch crashed:', err);
       return;
     }
 
-    habits.forEach(habit => {
+    // Filter client-side for habits that have a reminderTime set
+    const habitsWithReminders = habits.filter(h => h.reminderTime);
+
+    habitsWithReminders.forEach(habit => {
       if (habit.reminderTime === currentTime) {
         triggerNotification(
           'Habit Reminder',

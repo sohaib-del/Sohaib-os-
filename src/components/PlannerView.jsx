@@ -40,8 +40,18 @@ export default function PlannerView() {
   const [taskNote, setTaskNote] = useState('');
 
   const fetchTasks = async () => {
-    const { data } = await supabase.from('tasks').select('*');
-    setTasks(data || []);
+    try {
+      const { data, error } = await supabase.from('tasks').select('*');
+      if (error) {
+        console.warn('Tasks fetch error (table may not exist yet):', error.message);
+        setTasks([]);
+        return;
+      }
+      setTasks(data || []);
+    } catch (err) {
+      console.warn('Tasks fetch crashed, using empty array:', err);
+      setTasks([]);
+    }
   };
 
   useEffect(() => {
@@ -50,7 +60,9 @@ export default function PlannerView() {
     const channel = supabase
       .channel('tasks-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks())
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.warn('Realtime tasks subscription error (non-fatal):', err.message);
+      });
 
     return () => {
       supabase.removeChannel(channel);
