@@ -2,7 +2,7 @@ import { useMemo, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 import { DownloadIcon, AlertTriangle, Brain, Target, Clock, Zap } from 'lucide-react';
-import { supabase } from '../utils/supabase';
+import { supabase } from '@/features/database/services/supabase';
 
 const WIN_COLORS = ['#22C55E', '#4ade80', '#10b981', '#059669', '#86efac', '#34d399', '#6ee7b7'];
 const LOSS_COLORS = ['#EF4444', '#f87171', '#dc2626', '#b91c1c', '#fca5a5', '#ef4444', '#f87171'];

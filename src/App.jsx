@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Home, Calendar, BookOpen, BarChart2, Settings } from 'lucide-react';
-import { useHabits } from './hooks/useHabits';
-import { supabase } from './utils/supabase';
+import { useHabits } from '@/features/habits/hooks/useHabits';
+import { supabase } from '@/features/database/services/supabase';
 import TodayView from './components/TodayView';
 import PlannerView from './components/PlannerView';
 import JournalView from './components/JournalView';
@@ -29,15 +29,16 @@ function App() {
     };
     fetchTheme();
 
+    const channelName = `theme-sync-${Date.now()}`;
     const channel = supabase
-      .channel('theme-sync')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'key=eq.theme' }, (payload) => {
         if (payload?.new?.value) {
           setIsDark(payload.new.value === 'dark');
         }
       })
       .subscribe((status, err) => {
-        if (err) console.warn('Realtime theme subscription error (non-fatal):', err.message);
+        if (err) console.warn('Realtime theme subscription error (non-fatal):', err?.message);
       });
 
     return () => {
@@ -53,7 +54,7 @@ function App() {
       document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
     }
-    supabase.from('settings').upsert({ key: 'theme', value: isDark ? 'dark' : 'light' })
+    supabase.from('settings').upsert({ key: 'theme', value: isDark ? 'dark' : 'light' }, { onConflict: 'key' })
       .then(({ error }) => {
         if (error) console.warn('Theme upsert error (table may not exist yet):', error.message);
       });

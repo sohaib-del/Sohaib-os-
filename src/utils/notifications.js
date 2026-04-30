@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from '@/features/database/services/supabase';
 
 export const setupNotificationEngine = () => {
   // Request permission on start if not already granted

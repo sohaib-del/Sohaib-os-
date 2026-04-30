@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Moon, Sun, Bell, Trash2, Plus, LogOut, Cloud } from 'lucide-react';
-import { useHabits } from '../hooks/useHabits';
-import { supabase, migrateData } from '../utils/supabase';
+import { useHabits } from '@/features/habits/hooks/useHabits';
+import { supabase, migrateData } from '@/features/database/services/supabase';
 
 export default function SettingsView({ isDark, setIsDark }) {
   console.log("SettingsView rendering...");

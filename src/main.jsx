@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
-import { supabase, migrateData } from './utils/supabase'
+import { supabase, migrateData } from '@/features/database/services/supabase'
 import { setupNotificationEngine } from './utils/notifications'
 
 const init = async () => {

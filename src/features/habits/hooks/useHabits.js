@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../utils/supabase';
+import { supabase } from '@/features/database/services/supabase';
 
 const DEFAULT_HABITS = [
   {
@@ -129,9 +129,8 @@ export function useHabits() {
         setStartDate(settingsData.value);
       } else {
         const now = new Date().toISOString();
-        // Only attempt upsert if settings table might exist
         try {
-          await supabase.from('settings').upsert({ key: 'start_date', value: now });
+          await supabase.from('settings').upsert({ key: 'start_date', value: now }, { onConflict: 'key' });
         } catch (upsertErr) {
           console.warn("Settings upsert failed:", upsertErr);
         }
@@ -149,9 +148,9 @@ export function useHabits() {
   useEffect(() => {
     fetchData();
 
-    // Real-time Sync — .on() MUST be called before .subscribe()
+    const channelName = `habits-sync-${Date.now()}`;
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habits' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'slips' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => fetchData())
@@ -160,7 +159,7 @@ export function useHabits() {
           console.log('Realtime: habits/slips/settings channel active');
         }
         if (err) {
-          console.warn('Realtime subscription error (non-fatal):', err.message);
+          console.warn('Realtime subscription error (non-fatal):', err?.message);
         }
       });
 

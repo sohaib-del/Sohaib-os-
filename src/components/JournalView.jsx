@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { supabase } from '../utils/supabase';
+import { supabase } from '@/features/database/services/supabase';
 
 export default function JournalView() {
   const [entries, setEntries] = useState([]);
@@ -25,11 +25,12 @@ export default function JournalView() {
   useEffect(() => {
     fetchEntries();
 
+    const channelName = `journal-sync-${Date.now()}`;
     const channel = supabase
-      .channel('journal-sync')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_entries' }, () => fetchEntries())
       .subscribe((status, err) => {
-        if (err) console.warn('Realtime journal subscription error (non-fatal):', err.message);
+        if (err) console.warn('Realtime journal subscription error (non-fatal):', err?.message);
       });
 
     return () => {

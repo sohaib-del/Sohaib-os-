@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { supabase } from '../utils/supabase';
+import { supabase } from '@/features/database/services/supabase';
 
 // Custom checkbox component
 const Checkbox = ({ checked, onChange }) => (
@@ -57,11 +57,12 @@ export default function PlannerView() {
   useEffect(() => {
     fetchTasks();
 
+    const channelName = `tasks-sync-${Date.now()}`;
     const channel = supabase
-      .channel('tasks-sync')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks())
       .subscribe((status, err) => {
-        if (err) console.warn('Realtime tasks subscription error (non-fatal):', err.message);
+        if (err) console.warn('Realtime tasks subscription error (non-fatal):', err?.message);
       });
 
     return () => {

@@ -11,7 +11,7 @@ const TABLE_MAPPING = {
   'sohaibos_journal_entries': 'journal_entries',
   'sohaibos_slips': 'slips',
   'sohaibos_logs': 'logs',
-  'sohaibos_theme': 'settings', // specialized handling
+  'sohaibos_theme': 'settings',
   'sohaibos_pushup_start': 'settings',
   'sohaibos_start_date': 'settings',
   'sohaibos_planner_tasks': 'planner_tasks'
@@ -37,11 +37,6 @@ export const migrateData = async () => {
               supabase.from('settings').upsert({ key: key.replace('sohaibos_', ''), value: parsedData })
             )
           } else if (Array.isArray(parsedData)) {
-            // For arrays, we might want to insert each item or just the whole blob
-            // Given the prompt's simplicity, let's assume we store the whole JSON for now 
-            // or if we have a table with 'id' and 'data', but user said supabase.from('habits').select('*')
-            // which implies each habit is a row.
-            
             for (const item of parsedData) {
               migrationPromises.push(
                 supabase.from(tableName).upsert({ ...item })
@@ -62,8 +57,6 @@ export const migrateData = async () => {
   if (migrationPromises.length > 0) {
     await Promise.all(migrationPromises)
     console.log('Migration complete. Clearing localStorage.')
-    // Once migrated, we could clear localStorage, but let's be careful.
-    // The user asked: "automatically uploads it to Supabase on the first run, then clears the local storage."
     allKeys.forEach(k => {
       if (k.startsWith('sohaibos_')) {
         localStorage.removeItem(k)
