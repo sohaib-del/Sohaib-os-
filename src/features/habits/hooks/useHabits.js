@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/features/database/services/supabase';
 
 const DEFAULT_HABITS = [
@@ -81,69 +81,45 @@ export function useHabits() {
   const [startDate, setStartDate] = useState(null);
   const [slips, setSlips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const isFetching = useRef(false);
 
-  const fetchData = async () => {
-    console.log("fetchData started");
-    setLoading(true);
-
-    // Fetch Habits
+  const fetchData = useCallback(async () => {
+    if (isFetching.current) return;
+    console.log("fetchData triggered");
+    isFetching.current = true;
+    
     try {
-      console.log("Fetching habits...");
+      // Fetch Habits
       const { data: habitsData, error: habitsError } = await supabase.from('habits').select('*');
-      if (habitsError) {
-        console.warn("Habits fetch error (table may not exist yet):", habitsError.message);
-        setHabits(DEFAULT_HABITS);
-      } else if (habitsData && habitsData.length > 0) {
-        setHabits(habitsData.map(h => ({ ...h, streakCount: calculateStreak(h.logs) })));
+      if (!habitsError && habitsData) {
+        setHabits(habitsData.length > 0 
+          ? habitsData.map(h => ({ ...h, streakCount: calculateStreak(h.logs) }))
+          : DEFAULT_HABITS
+        );
       } else {
         setHabits(DEFAULT_HABITS);
       }
-    } catch (err) {
-      console.warn("Habits fetch crashed, using defaults:", err);
-      setHabits(DEFAULT_HABITS);
-    }
 
-    // Fetch Slips
-    try {
-      console.log("Fetching slips...");
+      // Fetch Slips
       const { data: slipsData, error: slipsError } = await supabase.from('slips').select('*');
-      if (slipsError) {
-        console.warn("Slips fetch error (table may not exist yet):", slipsError.message);
-        setSlips([]);
-      } else {
-        setSlips(slipsData || []);
-      }
-    } catch (err) {
-      console.warn("Slips fetch crashed, using empty array:", err);
-      setSlips([]);
-    }
+      if (!slipsError) setSlips(slipsData || []);
 
-    // Fetch Settings (startDate)
-    try {
-      console.log("Fetching settings...");
-      const { data: settingsData, error: settingsError } = await supabase.from('settings').select('*').eq('key', 'start_date').single();
-      if (settingsError && settingsError.code !== 'PGRST116') {
-        console.warn("Settings fetch error (table may not exist yet):", settingsError.message);
-      }
+      // Fetch Settings (startDate)
+      const { data: settingsData } = await supabase.from('settings').select('*').eq('key', 'start_date').single();
       if (settingsData) {
         setStartDate(settingsData.value);
       } else {
-        const now = new Date().toISOString();
-        try {
-          await supabase.from('settings').upsert({ key: 'start_date', value: now }, { onConflict: 'key' });
-        } catch (upsertErr) {
-          console.warn("Settings upsert failed:", upsertErr);
-        }
-        setStartDate(now);
+        // We set a local default, but don't upsert here to avoid triggering a loop
+        setStartDate(new Date().toISOString());
       }
     } catch (err) {
-      console.warn("Settings fetch crashed, using current date:", err);
-      setStartDate(new Date().toISOString());
+      console.warn("fetchData error:", err);
+    } finally {
+      setLoading(false);
+      isFetching.current = false;
+      console.log("fetchData finished");
     }
-
-    setLoading(false);
-    console.log("fetchData finished");
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -151,22 +127,24 @@ export function useHabits() {
     const channelName = `habits-sync-${Date.now()}`;
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'habits' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'slips' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => fetchData())
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Realtime: habits/slips/settings channel active');
-        }
-        if (err) {
-          console.warn('Realtime subscription error (non-fatal):', err?.message);
-        }
-      });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'habits' }, () => {
+        console.log("Realtime: habits changed");
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slips' }, () => {
+        console.log("Realtime: slips changed");
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
+        console.log("Realtime: settings changed");
+        fetchData();
+      })
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchData]);
 
   const addHabit = async (habit) => {
     const newHabit = { ...habit, logs: [], id: Date.now().toString() };

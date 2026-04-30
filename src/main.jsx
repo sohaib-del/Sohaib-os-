@@ -8,7 +8,7 @@ import { setupNotificationEngine } from './utils/notifications'
 const init = async () => {
   console.log("Initializing Sohaib OS...");
   try {
-    await migrateData();
+    migrateData(); // Run in background, don't block render
     // Test connection
     const { data, error } = await supabase.from('habits').select('*');
     console.log('Supabase habits fetch:', data, error);
