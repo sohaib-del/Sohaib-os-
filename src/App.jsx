@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Home, Calendar, BookOpen, BarChart2, Settings } from 'lucide-react';
 import { useHabits } from '@/features/habits/hooks/useHabits';
 import { supabase } from '@/features/database/services/supabase';
