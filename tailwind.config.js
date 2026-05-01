@@ -32,10 +32,20 @@ export default {
         urgePulse: {
           '0%, 100%': { opacity: 1 },
           '50%': { opacity: 0.5 },
+        },
+        'in': {
+          '0%': { opacity: '0', transform: 'translateY(4px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
         }
       },
       animation: {
         'urge-pulse': 'urgePulse 1.5s ease-in-out infinite',
+        'in': 'in 0.2s ease-out forwards',
+        'fade-in': 'fade-in 0.2s ease-out forwards',
       }
     },
   },

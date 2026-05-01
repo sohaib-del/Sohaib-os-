@@ -61,7 +61,18 @@ function App() {
       .catch(err => console.warn('Theme sync failed:', err));
   }, [isDark]);
 
-  const { habits, logHabit, slips } = useHabits();
+  const { habits, logHabit, slips, loading } = useHabits();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-green rounded-full border-t-transparent animate-spin"></div>
+          <p className="mono text-[11px] text-green tracking-[2px] uppercase">Booting System...</p>
+        </div>
+      </div>
+    );
+  }
 
   const TABS = [
     { id: 'today', icon: Home, label: 'Today' },
@@ -73,7 +84,7 @@ function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'today': return <TodayView habits={habits} logHabit={logHabit} />;
+      case 'today': return <TodayView habits={habits} logHabit={logHabit} startDate={startDate} />;
       case 'planner': return <PlannerView />;
       case 'journal': return <JournalView />;
       case 'stats': return <StatsView habits={habits} slips={slips} />;

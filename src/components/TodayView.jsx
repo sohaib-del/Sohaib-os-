@@ -58,13 +58,12 @@ const MissButton = ({ missed, onClick }) => (
   </div>
 );
 
-export default function TodayView({ habits, logHabit }) {
+export default function TodayView({ habits, logHabit, startDate }) {
   const [slipModal, setSlipModal] = useState(null);
   const [slipReason, setSlipReason] = useState('');
   const [selectedTrigger, setSelectedTrigger] = useState('');
   const [timeNow, setTimeNow] = useState(new Date());
 
-  const startDate = storage.get('start_date');
   const targetPushups = getPushupTarget(startDate);
 
   useEffect(() => {

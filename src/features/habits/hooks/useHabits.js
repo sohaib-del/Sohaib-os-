@@ -135,8 +135,8 @@ export function useHabits() {
         console.log("Realtime: slips changed");
         fetchData();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
-        console.log("Realtime: settings changed");
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'key=eq.start_date' }, () => {
+        console.log("Realtime: settings (start_date) changed");
         fetchData();
       })
       .subscribe();
